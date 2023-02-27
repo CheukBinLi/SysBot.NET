@@ -83,6 +83,7 @@ namespace SysBot.Net
                 {
                     Console.WriteLine("服务异常。");
                     Console.WriteLine(e.StackTrace);
+                    sendMessage(socket, e.StackTrace);
                 }
                 Console.WriteLine("客服结束服务。");
             }
@@ -294,6 +295,14 @@ namespace SysBot.Net
 
         public void sendMessage(Socket socket, CommandModel commandModel)
         {
+            socket.Send(System.Text.Encoding.Default.GetBytes(JsonConvert.SerializeObject(commandModel)));
+        }
+
+        public void sendMessage(Socket socket, String msg)
+        {
+            CommandModel commandModel = new CommandModel();
+            commandModel.code = -1;
+            commandModel.error = msg;
             socket.Send(System.Text.Encoding.Default.GetBytes(JsonConvert.SerializeObject(commandModel)));
         }
 
