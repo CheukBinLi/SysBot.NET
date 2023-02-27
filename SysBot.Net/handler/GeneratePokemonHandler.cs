@@ -23,7 +23,7 @@ namespace SysBot.Net.handler
 
         public override void execute(ref Server server, ref Socket socket, CommandModel command)
         {
-
+            ITrainerInfo sav = AutoLegalityWrapper.GetTrainerInfo<PK9>();
             CommandModel response = new CommandModel();
             List<String> responseList = new List<string>();
             List<String> species = new List<String>();
@@ -32,40 +32,47 @@ namespace SysBot.Net.handler
             responseData.Add("species", species);
 
             Newtonsoft.Json.Linq.JArray param = (Newtonsoft.Json.Linq.JArray)command.param["data"];
+            String dataType = $"{command.param["dataType"]}";
             Newtonsoft.Json.Linq.JObject additionalResult;
             if (null != param && param.Count() > 0)
             {
                 for (int i = 0; i < param.Count(); i++)
                 {
-                    String content = Encoding.UTF8.GetString(CommandHandler.decodeBase64($"{param[i]}"));
+                    PK9 pkm;
                     var additional = command.param.ContainsKey("additional") ? (Newtonsoft.Json.Linq.JObject)command.param["additional"] : new Newtonsoft.Json.Linq.JObject();
-                    String converName = content;
-                    if (!content.Contains(":"))
+                    if ("txt".Equals(dataType))
                     {
-                        converName = ShowdownTranslator<PK9>.Chinese2Showdown(content, ref additional, out additionalResult);
-                        additional = additionalResult;
-                    }
+                        String content = Encoding.UTF8.GetString(CommandHandler.decodeBase64($"{param[i]}"));
+                        //String converName = content;
+                        if (!content.Contains(":"))
+                        {
+                            content = ShowdownTranslator<PK9>.Chinese2Showdown(content, ref additional, out additionalResult);
+                            additional = additionalResult;
+                        }
 
-                    //Console.WriteLine(converName);
-                    var set = SysBot.Pokemon.ShowdownUtil.ConvertToShowdown(converName);
-                    var template = AutoLegalityWrapper.GetTemplate(set);
-                    if (template.Species < 1)
+                        //Console.WriteLine(converName);
+                        var set = SysBot.Pokemon.ShowdownUtil.ConvertToShowdown(content);
+                        var template = AutoLegalityWrapper.GetTemplate(set);
+                        if (template.Species < 1)
+                        {
+                            response.error += "请输入正确的宝可梦名称。\n";
+                            response.code = -1;
+                            continue;
+                        }
+
+                        if (set.InvalidLines.Count != 0)
+                        {
+                            response.error += "属性值异常。\n";
+                            response.code = -1;
+                            continue;
+                        }
+
+                        pkm = (PK9)sav.GetLegal(template, out var result);
+                    }
+                    else
                     {
-                        response.error += "请输入正确的宝可梦名称。\n";
-                        response.code = -1;
-                        continue;
+                        pkm = new PK9(CommandHandler.decodeBase64($"{param[i]}"));
                     }
-
-                    if (set.InvalidLines.Count != 0)
-                    {
-                        response.error += "属性值异常。\n";
-                        response.code = -1;
-                        continue;
-                    }
-
-                    ITrainerInfo sav = AutoLegalityWrapper.GetTrainerInfo<PK9>();
-
-                    PK9 pkm = (PK9)sav.GetLegal(template, out var result);
 
                     if (command.param.ContainsKey("additional"))
                     {
