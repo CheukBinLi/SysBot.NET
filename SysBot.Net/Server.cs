@@ -83,7 +83,10 @@ namespace SysBot.Net
                 {
                     Console.WriteLine("服务异常。");
                     Console.WriteLine(e.StackTrace);
-                    sendMessage(socket, e.StackTrace);
+                    try
+                    {
+                        sendMessage(socket, e.StackTrace);
+                    }catch (Exception ex) { }
                 }
                 Console.WriteLine("客服结束服务。");
             }
@@ -311,7 +314,7 @@ namespace SysBot.Net
         {
             byte[] data = System.Text.Encoding.Default.GetBytes("比卡丘");
             var additional = new Newtonsoft.Json.Linq.JObject();
-            String converName = ShowdownTranslator<PK9>.Chinese2Showdown(Encoding.UTF8.GetString(data, 0, data.Length),ref additional, out additional);
+            String converName = ShowdownTranslator<PK9>.Chinese2Showdown(Encoding.UTF8.GetString(data, 0, data.Length), ref additional, out additional);
             Console.WriteLine("converName");
         }
 
