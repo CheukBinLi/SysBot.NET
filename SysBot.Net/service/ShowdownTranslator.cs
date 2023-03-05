@@ -27,52 +27,30 @@ namespace SysBot.Net.service
 
             if (candidateSpecieNo > 0)
             {
-                if (candidateSpecieNo == 29) result = "Nidoran-F";
-                else if (candidateSpecieNo == 32) result = "Nidoran-M";
+                if (candidateSpecieNo == (int)Species.NidoranF) result = "Nidoran-F";
+                else if (candidateSpecieNo == (int)Species.NidoranM) result = "Nidoran-M";
                 else result += GameStringsEn.Species[candidateSpecieNo];
 
                 zh = zh.Replace(GameStringsZh.Species[candidateSpecieNo], "");
 
                 // 特殊性别差异
                 // 29-尼多兰F，32-尼多朗M，678-超能妙喵F，876-爱管侍F，902-幽尾玄鱼F, 916-飘香豚
-                if ((candidateSpecieNo is 678 or 876 or 902 or 916) && zh.Contains("母")) result += "-F";
+                if (((Species)candidateSpecieNo is Species.Meowstic or Species.Indeedee or Species.Basculegion or Species.Oinkologne)
+                    && zh.Contains("母")) result += "-F";
             }
             else
             {
                 return result;
             }
 
-            // 识别未知图腾
-            if (Regex.IsMatch(zh, "[A-Z?!？！]形态"))
-            {
-                string formsUnown = Regex.Match(zh, "([A-Z?!？！])形态").Groups?[1]?.Value ?? "";
-                if (formsUnown == "？") formsUnown = "?";
-                else if (formsUnown == "！") formsUnown = "!";
-                result += $"-{formsUnown}";
-                zh = Regex.Replace(zh, "[A-Z?!？！]形态", "");
-            }
-
             // 识别地区形态
-            if (zh.Contains("帕底亚的样子（火）形态"))
+            foreach (var s in formDict)
             {
-                result += $"-Paldea-Fire";
-                zh = zh.Replace("帕底亚的样子（火）形态", "");
-            }
-            else if (zh.Contains("帕底亚的样子（水）形态"))
-            {
-                result += $"-Paldea-Water";
-                zh = zh.Replace("帕底亚的样子（水）形态", "");
-            }
-            else
-            {
-                for (int i = 0; i < GameStringsZh.forms.Length; i++)
-                {
-                    if (GameStringsZh.forms[i].Length == 0) continue;
-                    if (!zh.Contains(GameStringsZh.forms[i] + "形态")) continue;
-                    result += $"-{GameStringsEn.forms[i]}";
-                    zh = zh.Replace(GameStringsZh.forms[i] + "形态", "");
-                    break;
-                }
+                var searchKey = s.Key.EndsWith("形态") ? s.Key : s.Key + "形态";
+                if (!zh.Contains(searchKey)) continue;
+                result += $"-{s.Value}";
+                zh = zh.Replace(searchKey, "");
+                break;
             }
 
             // 添加性别
@@ -324,6 +302,13 @@ namespace SysBot.Net.service
                 }
             }
 
+            // 补充后天获得的全奖章 注意开启Legality=>AllowBatchCommands
+            if (typeof(T) == typeof(PK9) && zh.Contains("全奖章"))
+            {
+                result += "\n.Ribbons=$suggestAll\n.RibbonMarkPartner=True\n.RibbonMarkGourmand=True";
+                zh = zh.Replace("全奖章", "");
+                additionalResult.Add("全奖章", 0);
+            }
             // 体型大小并添加证章
             if (typeof(T) == typeof(PK9) && zh.Contains("大个子"))
             {
@@ -345,16 +330,17 @@ namespace SysBot.Net.service
                 {
                     result += "\n.RelearnMoves=$suggestAll";
                     zh = zh.Replace("全技能", "");
+                    additionalResult.Add("全技能", 0);
 
                 }
                 else if (zh.Contains("全招式"))
                 {
                     result += "\n.RelearnMoves=$suggestAll";
                     zh = zh.Replace("全招式", "");
+                    additionalResult.Add("全技能", 0);
                 }
-                additionalResult.Add("全技能", 0);
             }
-            if (typeof(T) == typeof(PA8))
+            else if (typeof(T) == typeof(PA8))
             {
                 if (zh.Contains("全技能"))
                 {
@@ -366,17 +352,40 @@ namespace SysBot.Net.service
                     result += "\n.MoveMastery=$suggestAll";
                     zh = zh.Replace("全招式", "");
                 }
-                additionalResult.Add("全技能", 0);
             }
 
-            //全奖章
-            if (typeof(T) == typeof(PK9) && zh.Contains("全奖章"))
+            if (zh.Contains("异国")) { result += "\nLanguage: Italian"; zh = zh.Replace("异国", ""); }
+            else if (zh.Contains("日语")) { result += "\nLanguage: Japanese"; zh = zh.Replace("日语", ""); }
+            else if (zh.Contains("英语")) { result += "\nLanguage: English"; zh = zh.Replace("英语", ""); }
+            else if (zh.Contains("法语")) { result += "\nLanguage: French"; zh = zh.Replace("法语", ""); }
+            else if (zh.Contains("意大利语")) { result += "\nLanguage: Italian"; zh = zh.Replace("意大利语", ""); }
+            else if (zh.Contains("德语")) { result += "\nLanguage: German"; zh = zh.Replace("德语", ""); }
+            else if (zh.Contains("西班牙语")) { result += "\nLanguage: Spanish"; zh = zh.Replace("西班牙语", ""); }
+            else if (zh.Contains("韩语")) { result += "\nLanguage: Korean"; zh = zh.Replace("韩语", ""); }
+            else if (zh.Contains("简体中文")) { result += "\nLanguage: ChineseS"; zh = zh.Replace("简体中文", ""); }
+            else if (zh.Contains("繁体中文")) { result += "\nLanguage: ChineseT"; zh = zh.Replace("繁体中文", ""); }
+
+            // 添加技能 原因：PKHeX.Core.ShowdownSet#ParseLines中，若招式数满足4个则不再解析，所以招式文本应放在最后
+            for (int moveCount = 0; moveCount < 4; moveCount++)
             {
-                result += $"\n.RibbonMarkItemfinder=true\n.RibbonMarkPartner=true\n.RibbonMarkGourmand=true\n.RibbonMarkAlpha=true\n.RibbonMarkMightiest=true\n.RibbonMarkTitan=true";
-                zh = zh.Replace("全奖章", "");
-                additionalResult.Add("全奖章", 0);
-            }
+                int candidateIndex = -1;
+                int candidateLength = 0;
+                for (int i = 0; i < GameStringsZh.Move.Count; i++)
+                {
+                    if (GameStringsZh.Move[i].Length == 0) continue;
+                    if (!zh.Contains("-" + GameStringsZh.Move[i])) continue;
+                    // 吸取 吸取拳
+                    if (candidateIndex == -1 || GameStringsZh.Move[i].Length > candidateLength)
+                    {
+                        candidateIndex = i;
+                        candidateLength = GameStringsZh.Move[i].Length;
+                    }
+                }
+                if (candidateIndex == -1) continue;
 
+                result += $"\n-{GameStringsEn.Move[candidateIndex]}";
+                zh = zh.Replace("-" + GameStringsZh.Move[candidateIndex], "");
+            }
 
             return result;
         }
@@ -387,6 +396,188 @@ namespace SysBot.Net.service
             return GameStringsZh.Species[species];
 
         }
+
+        #region 形态中文ps字典，感谢ppllouf
+        public static Dictionary<string, string> formDict = new Dictionary<string, string> {
+            {"阿罗拉","Alola"},
+            {"初始","Original"},
+            {"丰缘","Hoenn"},
+            {"神奥","Sinnoh"},
+            {"合众","Unova"},
+            {"卡洛斯","Kalos"},
+            {"就决定是你了","Partner"},
+            {"搭档","Starter"},
+            {"世界","World"},
+            {"摇滚巨星","Rock-Star"},
+            {"贵妇","Belle"},
+            {"流行偶像","Pop-Star"},
+            {"博士","PhD"},
+            {"面罩摔角手","Libre"},
+            {"换装","Cosplay"},
+            {"伽勒尔","Galar"},
+            {"洗翠","Hisui"},
+            {"帕底亚的样子斗战种","Paldea-Combat"},
+            {"帕底亚的样子火炽种","Paldea-Blaze"},
+            {"帕底亚的样子水澜种","Paldea-Aqua"},
+            {"刺刺耳","Spiky-eared"},
+            {"帕底亚","Paldea"},
+            {"B","B"},
+            {"C","C"},
+            {"D","D"},
+            {"E","E"},
+            {"F","F"},
+            {"G","G"},
+            {"H","H"},
+            {"I","I"},
+            {"J","J"},
+            {"K","K"},
+            {"L","L"},
+            {"M","M"},
+            {"N","N"},
+            {"O","O"},
+            {"P","P"},
+            {"Q","Q"},
+            {"R","R"},
+            {"S","S"},
+            {"T","T"},
+            {"U","U"},
+            {"V","V"},
+            {"W","W"},
+            {"X","X"},
+            {"Y","Y"},
+            {"Z","Z"},
+            {"！","Exclamation"},
+            {"？","Question"},
+            {"太阳的样子","Sunny"},
+            {"雨水的样子","Rainy"},
+            {"雪云的样子","Snowy"},
+            {"原始回归的样子","Primal"},
+            {"攻击形态","Attack"},
+            {"防御形态","Defense"},
+            {"速度形态","Speed"},
+            {"砂土蓑衣","Sandy"},
+            {"垃圾蓑衣","Trash"},
+            {"晴天形态","Sunshine"},
+            {"东海","East"},
+            {"加热","Heat"},
+            {"清洗","Wash"},
+            {"结冰","Frost"},
+            {"旋转","Fan"},
+            {"切割","Mow"},
+            {"起源","Origin"},
+            {"天空","Sky"},
+            {"格斗","Fighting"},
+            {"飞行","Flying"},
+            {"毒","Poison"},
+            {"地面","Ground"},
+            {"岩石","Rock"},
+            {"虫","Bug"},
+            {"幽灵","Ghost"},
+            {"钢","Steel"},
+            {"火","Fire"},
+            {"水","Water"},
+            {"草","Grass"},
+            {"电","Electric"},
+            {"超能力","Psychic"},
+            {"冰","Ice"},
+            {"龙","Dragon"},
+            {"恶","Dark"},
+            {"妖精","Fairy"},
+            {"蓝条纹的样子","Blue-Striped"},
+            {"白条纹的样子","White-Striped"},
+            {"夏天的样子","Summer"},
+            {"秋天的样子","Autumn"},
+            {"冬天的样子","Winter"},
+            {"灵兽形态","Therian"},
+            {"暗黑","White"},
+            {"焰白","Black"},
+            {"觉悟的样子","Resolute"},
+            {"舞步形态","Pirouette"},
+            {"水流卡带","Douse"},
+            {"闪电卡带","Shock"},
+            {"火焰卡带","Burn"},
+            {"冰冻卡带","Chill"},
+            {"小智版","Ash"},
+            {"冰雪花纹","Icy Snow"},
+            {"雪国花纹","Polar"},
+            {"雪原花纹","Tundra"},
+            {"大陆花纹","Continental"},
+            {"庭院花纹","Garden"},
+            {"高雅花纹","Elegant"},
+            {"摩登花纹","Modern"},
+            {"大海花纹","Marine"},
+            {"群鸟花纹","Archipelago"},
+            {"荒野花纹","High Plains"},
+            {"沙尘花纹","Sandstorm"},
+            {"大河花纹","River"},
+            {"骤雨花纹","Monsoon"},
+            {"热带草原花纹","Savanna"},
+            {"太阳花纹","Sun"},
+            {"大洋花纹","Ocean"},
+            {"热带雨林花纹","Jungle"},
+            {"幻彩花纹","Fancy"},
+            {"球球花纹","Pokeball"},
+            {"蓝花","Blue"},
+            {"橙花","Orange"},
+            {"白花","White"},
+            {"黄花","Yellow"},
+            {"永恒","Eternal"},
+            {"心形造型","Heart"},
+            {"星形造型","Star"},
+            {"菱形造型","Diamond"},
+            {"淑女造型","Debutante"},
+            {"贵妇造型","Matron"},
+            {"绅士造型","Dandy"},
+            {"女王造型","La Reine"},
+            {"歌舞伎造型","Kabuki"},
+            {"国王造型","Pharaoh"},
+            {"小尺寸","Small"},
+            {"大尺寸","Large"},
+            {"特大尺寸","Super"},
+            {"解放","Unbound"},
+            {"啪滋啪滋风格","Pom-Pom"},
+            {"呼拉呼拉风格","Pa'u"},
+            {"轻盈轻盈风格","Sensu"},
+            {"黑夜的样子","Midnight"},
+            {"黄昏的样子","Dusk"},
+            {"流星的样子","Meteor"},
+            {"橙色核心","Orange"},
+            {"黄色核心","Yellow"},
+            {"绿色核心","Green"},
+            {"浅蓝色核心","Blue"},
+            {"蓝色核心","Indigo"},
+            {"紫色核心","Violet"},
+            {"黄昏之鬃","Dusk-Mane"},
+            {"拂晓之翼","Dawn-Wings"},
+            {"究极","Ultra"},
+            {"５００年前的颜色","Original"},
+            {"低调的样子","Low-Key"},
+            {"真品","Antique"},
+            {"奶香红钻","Ruby-Cream"},
+            {"奶香抹茶","Matcha-Cream"},
+            {"奶香薄荷","Mint-Cream"},
+            {"奶香柠檬","Lemon-Cream"},
+            {"奶香雪盐","Salted-Cream"},
+            {"红钻综合","Ruby-Swirl"},
+            {"焦糖综合","Caramel-Swirl"},
+            {"三色综合","Rainbow-Swirl"},
+            {"剑之王","Crowned"},
+            {"盾之王","Crowned"},
+            {"无极巨化","Eternamax"},
+            {"连击流","Rapid-Strike"},
+            {"阿爸","Dada"},
+            {"骑白马的样子","Ice"},
+            {"骑黑马的样子","Shadow"},
+            {"四只家庭","Four"},
+            {"蓝羽毛","Blue"},
+            {"黄羽毛","Yellow"},
+            {"白羽毛","White"},
+            {"下垂姿势","Droopy"},
+            {"平挺姿势","Stretchy"},
+            {"三节形态","Three-Segment"},
+        };
+        #endregion
+
     }
 
 
