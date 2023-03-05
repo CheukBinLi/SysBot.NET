@@ -135,7 +135,7 @@ namespace SysBot.Net.handler
             cln.TrainerTID7 = displayTID;
             //Console.WriteLine(cln.TrainerTID7);
             cln.Language = language;
-            cln.OT_Name = otName;
+            //cln.OT_Name = otName;
             cln.Version = gameVersion;
             cln.ClearNickname();
 
