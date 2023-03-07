@@ -34,6 +34,7 @@ namespace SysBot.Net.handler
             Newtonsoft.Json.Linq.JArray param = (Newtonsoft.Json.Linq.JArray)command.param["data"];
             String dataType = $"{command.param["dataType"]}";
             Newtonsoft.Json.Linq.JObject additionalResult;
+
             if (null != param && param.Count() > 0)
             {
                 for (int i = 0; i < param.Count(); i++)
@@ -46,7 +47,7 @@ namespace SysBot.Net.handler
                         //String converName = content;
                         if (!content.Contains(":"))
                         {
-                            content = ShowdownTranslator<PK9>.Chinese2Showdown(content, ref additional, out additionalResult);
+                            content = service.ShowdownTranslator<PK9>.Chinese2Showdown(content, ref additional, out additionalResult);
                             additional = additionalResult;
                         }
 
@@ -68,6 +69,9 @@ namespace SysBot.Net.handler
                         }
 
                         pkm = (PK9)sav.GetLegal(template, out var result);
+                        var nickname = pkm.Nickname.ToLower();
+                        if (nickname == "egg" && Breeding.CanHatchAsEgg(pkm.Species))
+                            TradeExtensions<PK9>.EggTrade(pkm, template);
                     }
                     else
                     {
@@ -84,20 +88,21 @@ namespace SysBot.Net.handler
                             pkm.Gender,
                             (uint)additional["DisplayTID"],
                             (uint)additional["DisplaySID"],
+                            pkm.Nickname.ToLower() == "egg",
                             additional
                             );
                     }
 
                     if (!pkm.CanBeTraded())
                     {
-                        response.error += $"官方禁止该《{ShowdownTranslator<PK9>.getPkmName(pkm.Species)}》宝可梦交易。\n";
+                        response.error += $"官方禁止该《{service.ShowdownTranslator<PK9>.getPkmName(pkm.Species)}》宝可梦交易。\n";
                         response.code = -1;
                         continue;
                     }
                     var a = new LegalityAnalysis(pkm).Valid;
                     if (!new LegalityAnalysis(pkm).Valid)
                     {
-                        response.error += $"没办法创造非法属性(例如：闪耀)/版本专有宝可梦《{ShowdownTranslator<PK9>.getPkmName(pkm.Species)}》。\n";
+                        response.error += $"没办法创造非法属性(例如：闪耀)/版本专有宝可梦《{service.ShowdownTranslator<PK9>.getPkmName(pkm.Species)}》。\n";
                         response.code = -1;
                         continue;
                     }
@@ -124,9 +129,14 @@ namespace SysBot.Net.handler
         }
 
 
-        private PK9 copyRebuild(PK9 toSend, String otName, int gameVersion, int language, int gender, uint displayTID, uint displaySID, Newtonsoft.Json.Linq.JObject additional)
+        private PK9 copyRebuild(PK9 toSend, String otName, int gameVersion, int language, int gender, uint displayTID, uint displaySID, bool egg, Newtonsoft.Json.Linq.JObject additional)
         {
-            PK9 cln = (PK9)toSend.Clone();
+            if (egg)
+            {
+                return toSend;
+            }
+            //PK9 cln = (PK9)toSend.Clone();
+            PK9 cln = toSend;
             cln.OT_Gender = gender;
             //cln.TrainerTID7 = (uint)Math.Abs(displayTID);
             //cln.TrainerSID7 = (uint)Math.Abs(displaySID);
@@ -134,10 +144,12 @@ namespace SysBot.Net.handler
             cln.TrainerSID7 = displaySID;
             cln.TrainerTID7 = displayTID;
             //Console.WriteLine(cln.TrainerTID7);
-            cln.Language = language;
+            //cln.Language = language;
             //cln.OT_Name = otName;
             cln.Version = gameVersion;
             cln.ClearNickname();
+            if (toSend.IsShiny)
+                cln.SetShiny();
 
             if (additional.ContainsKey("全技能"))
             {
@@ -149,6 +161,7 @@ namespace SysBot.Net.handler
                         cln.SetMoveRecordFlag(i);
                 }
             }
+
             //全奖章
             if (additional.ContainsKey("大个子"))
             {
@@ -160,7 +173,7 @@ namespace SysBot.Net.handler
                 cln.RibbonMarkMini = true;
                 cln.Scale = 0;
             }
-            if (additional.ContainsKey("全技能"))
+            if (additional.ContainsKey("全奖章"))
             {
                 //cln.RibbonMarkItemfinder = true;
                 cln.RibbonMarkPartner = true;
@@ -173,8 +186,6 @@ namespace SysBot.Net.handler
                 cln.RibbonChampionPaldea = true;
             }
 
-            if (toSend.IsShiny)
-                cln.SetShiny();
             return cln;
         }
 

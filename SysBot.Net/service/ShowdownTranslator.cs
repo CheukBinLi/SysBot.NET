@@ -25,33 +25,79 @@ namespace SysBot.Net.service
                 }
             }
 
-            if (candidateSpecieNo > 0)
-            {
-                if (candidateSpecieNo == (int)Species.NidoranF) result = "Nidoran-F";
-                else if (candidateSpecieNo == (int)Species.NidoranM) result = "Nidoran-M";
-                else result += GameStringsEn.Species[candidateSpecieNo];
-
-                zh = zh.Replace(GameStringsZh.Species[candidateSpecieNo], "");
-
-                // 特殊性别差异
-                // 29-尼多兰F，32-尼多朗M，678-超能妙喵F，876-爱管侍F，902-幽尾玄鱼F, 916-飘香豚
-                if (((Species)candidateSpecieNo is Species.Meowstic or Species.Indeedee or Species.Basculegion or Species.Oinkologne)
-                    && zh.Contains("母")) result += "-F";
-            }
-            else
+            if (candidateSpecieNo <= 0)
             {
                 return result;
             }
 
-            // 识别地区形态
-            foreach (var s in formDict)
+            // 处理蛋宝可梦
+            if (zh.Contains("的蛋"))
             {
-                var searchKey = s.Key.EndsWith("形态") ? s.Key : s.Key + "形态";
-                if (!zh.Contains(searchKey)) continue;
-                result += $"-{s.Value}";
-                zh = zh.Replace(searchKey, "");
-                break;
+                result += "Egg ";
+                zh = zh.Replace("的蛋", "");
+
+                // Showdown 文本差异，29-尼多兰F，32-尼多朗M，876-爱管侍，
+                if (candidateSpecieNo is (ushort)Species.NidoranF) result += "(Nidoran-F)";
+                else if (candidateSpecieNo is (ushort)Species.NidoranM) result += "(Nidoran-M)";
+                else if ((candidateSpecieNo is (ushort)Species.Indeedee) && zh.Contains('母')) result += $"({GameStringsEn.Species[candidateSpecieNo]}-F)";
+                // 识别地区形态
+                else if (zh.Contains("形态"))
+                {
+                    foreach (var s in formDict)
+                    {
+                        var searchKey = s.Key.EndsWith("形态") ? s.Key : s.Key + "形态";
+                        if (!zh.Contains(searchKey)) continue;
+                        result += $"({GameStringsEn.Species[candidateSpecieNo]}-{s.Value})";
+                        zh = zh.Replace(searchKey, "");
+                        break;
+                    }
+                }
+                else result += $"({GameStringsEn.Species[candidateSpecieNo]})";
             }
+            // 处理非蛋宝可梦
+            else
+            {
+                // Showdown 文本差异，29-尼多兰F，32-尼多朗M，678-超能妙喵，876-爱管侍，902-幽尾玄鱼, 916-飘香豚
+                if (candidateSpecieNo is (ushort)Species.NidoranF) result = "Nidoran-F";
+                else if (candidateSpecieNo is (ushort)Species.NidoranM) result = "Nidoran-M";
+                else if ((candidateSpecieNo is (ushort)Species.Meowstic or (ushort)Species.Indeedee or (ushort)Species.Basculegion or (ushort)Species.Oinkologne) && zh.Contains("母"))
+                    result += $"{GameStringsEn.Species[candidateSpecieNo]}-F";
+                // 识别地区形态
+                else if (zh.Contains("形态"))
+                {
+                    foreach (var s in formDict)
+                    {
+                        var searchKey = s.Key.EndsWith("形态") ? s.Key : s.Key + "形态";
+                        if (!zh.Contains(searchKey)) continue;
+                        result = $"{GameStringsEn.Species[candidateSpecieNo]}-{s.Value}";
+                        zh = zh.Replace(searchKey, "");
+                        break;
+                    }
+                }
+                else result = $"{GameStringsEn.Species[candidateSpecieNo]}";
+                zh = zh.Replace(GameStringsZh.Species[candidateSpecieNo], "");
+            }
+            //if (candidateSpecieNo == (int)Species.NidoranF) result = "Nidoran-F";
+            //else if (candidateSpecieNo == (int)Species.NidoranM) result = "Nidoran-M";
+            //else result += GameStringsEn.Species[candidateSpecieNo];
+
+            //zh = zh.Replace(GameStringsZh.Species[candidateSpecieNo], "");
+
+            // 特殊性别差异
+            // 29-尼多兰F，32-尼多朗M，678-超能妙喵F，876-爱管侍F，902-幽尾玄鱼F, 916-飘香豚
+            if (((Species)candidateSpecieNo is Species.Meowstic or Species.Indeedee or Species.Basculegion or Species.Oinkologne)
+                && zh.Contains("母")) result += "-F";
+
+
+            //// 识别地区形态
+            //foreach (var s in formDict)
+            //{
+            //    var searchKey = s.Key.EndsWith("形态") ? s.Key : s.Key + "形态";
+            //    if (!zh.Contains(searchKey)) continue;
+            //    result += $"-{s.Value}";
+            //    zh = zh.Replace(searchKey, "");
+            //    break;
+            //}
 
             // 添加性别
             if (zh.Contains("公"))
@@ -364,6 +410,70 @@ namespace SysBot.Net.service
             else if (zh.Contains("韩语")) { result += "\nLanguage: Korean"; zh = zh.Replace("韩语", ""); }
             else if (zh.Contains("简体中文")) { result += "\nLanguage: ChineseS"; zh = zh.Replace("简体中文", ""); }
             else if (zh.Contains("繁体中文")) { result += "\nLanguage: ChineseT"; zh = zh.Replace("繁体中文", ""); }
+            else { result += "\nLanguage: ChineseS"; zh = zh.Replace("简体中文", ""); }
+
+            //补充后天获得的全奖章
+            if (typeof(T) == typeof(PK9) && zh.Contains("全奖章"))
+            {
+                result += "\n.Ribbons=$suggestAll\n.RibbonMarkPartner=True\n.RibbonMarkGourmand=True";
+                zh = zh.Replace("全奖章", "");
+            }
+            //为野生宝可梦添加证章
+            if (typeof(T) == typeof(PK9))
+            {
+                if (zh.Contains("最强之证")) { result += "\n.RibbonMarkMightiest=True"; }
+                else if (zh.Contains("未知之证")) { result += "\n.RibbonMarkRare=True"; }
+                else if (zh.Contains("命运之证")) { result += "\n.RibbonMarkDestiny=True"; }
+                else if (zh.Contains("暴雪之证")) { result += "\n.RibbonMarkBlizzard=True"; }
+                else if (zh.Contains("阴云之证")) { result += "\n.RibbonMarkCloudy=True"; }
+                else if (zh.Contains("正午之证")) { result += "\n.RibbonMarkLunchtime=True"; }
+                else if (zh.Contains("浓雾之证")) { result += "\n.RibbonMarkMisty=True"; }
+                else if (zh.Contains("降雨之证")) { result += "\n.RibbonMarkRainy=True"; }
+                else if (zh.Contains("沙尘之证")) { result += "\n.RibbonMarkSandstorm=True"; }
+                else if (zh.Contains("午夜之证")) { result += "\n.RibbonMarkSleepyTime=True"; }
+                else if (zh.Contains("降雪之证")) { result += "\n.RibbonMarkSnowy=True"; }
+                else if (zh.Contains("落雷之证")) { result += "\n.RibbonMarkStormy=True"; }
+                else if (zh.Contains("干燥之证")) { result += "\n.RibbonMarkDry=True"; }
+                else if (zh.Contains("黄昏之证")) { result += "\n.RibbonMarkDusk=True"; }
+                else if (zh.Contains("拂晓之证")) { result += "\n.RibbonMarkDawn=True"; }
+                else if (zh.Contains("上钩之证")) { result += "\n.RibbonMarkFishing=True"; }
+                else if (zh.Contains("咖喱之证")) { result += "\n.RibbonMarkCurry=True"; }
+                else if (zh.Contains("无虑之证")) { result += "\n.RibbonMarkAbsentMinded=True"; }
+                else if (zh.Contains("愤怒之证")) { result += "\n.RibbonMarkAngry=True"; }
+                else if (zh.Contains("冷静之证")) { result += "\n.RibbonMarkCalmness=True"; }
+                else if (zh.Contains("领袖之证")) { result += "\n.RibbonMarkCharismatic=True"; }
+                else if (zh.Contains("狡猾之证")) { result += "\n.RibbonMarkCrafty=True"; }
+                else if (zh.Contains("期待之证")) { result += "\n.RibbonMarkExcited=True"; }
+                else if (zh.Contains("本能之证")) { result += "\n.RibbonMarkFerocious=True"; }
+                else if (zh.Contains("动摇之证")) { result += "\n.RibbonMarkFlustered=True"; }
+                else if (zh.Contains("木讷之证")) { result += "\n.RibbonMarkHumble=True"; }
+                else if (zh.Contains("理性之证")) { result += "\n.RibbonMarkIntellectual=True"; }
+                else if (zh.Contains("热情之证")) { result += "\n.RibbonMarkIntense=True"; }
+                else if (zh.Contains("捡拾之证")) { result += "\n.RibbonMarkItemfinder=True"; }
+                else if (zh.Contains("紧张之证")) { result += "\n.RibbonMarkJittery=True"; }
+                else if (zh.Contains("幸福之证")) { result += "\n.RibbonMarkJoyful=True"; }
+                else if (zh.Contains("优雅之证")) { result += "\n.RibbonMarkKindly=True"; }
+                else if (zh.Contains("激动之证")) { result += "\n.RibbonMarkPeeved=True"; }
+                else if (zh.Contains("自信之证")) { result += "\n.RibbonMarkPrideful=True"; }
+                else if (zh.Contains("昂扬之证")) { result += "\n.RibbonMarkPumpedUp=True"; }
+                else if (zh.Contains("未知之证")) { result += "\n.RibbonMarkRare=True"; }
+                else if (zh.Contains("淘气之证")) { result += "\n.RibbonMarkRowdy=True"; }
+                else if (zh.Contains("凶悍之证")) { result += "\n.RibbonMarkScowling=True"; }
+                else if (zh.Contains("不振之证")) { result += "\n.RibbonMarkSlump=True"; }
+                else if (zh.Contains("微笑之证")) { result += "\n.RibbonMarkSmiley=True"; }
+                else if (zh.Contains("悲伤之证")) { result += "\n.RibbonMarkTeary=True"; }
+                else if (zh.Contains("不纯之证")) { result += "\n.RibbonMarkThorny=True"; }
+                else if (zh.Contains("偶遇之证")) { result += "\n.RibbonMarkUncommon=True"; }
+                else if (zh.Contains("自卑之证")) { result += "\n.RibbonMarkUnsure=True"; }
+                else if (zh.Contains("爽快之证")) { result += "\n.RibbonMarkUpbeat=True"; }
+                else if (zh.Contains("活力之证")) { result += "\n.RibbonMarkVigor=True"; }
+                else if (zh.Contains("倦怠之证")) { result += "\n.RibbonMarkZeroEnergy=True"; }
+                else if (zh.Contains("疏忽之证")) { result += "\n.RibbonMarkZonedOut=True"; }
+                else if (zh.Contains("宝主之证")) { result += "\n.RibbonMarkTitan=True"; }
+                if (zh.Contains("大个子之证")) { result += "\n.Scale=255\n.RibbonMarkJumbo=True"; }
+                else if (zh.Contains("小个子之证")) { result += "\n.Scale=0\n.RibbonMarkMini=True"; }
+
+            }
 
             // 添加技能 原因：PKHeX.Core.ShowdownSet#ParseLines中，若招式数满足4个则不再解析，所以招式文本应放在最后
             for (int moveCount = 0; moveCount < 4; moveCount++)
